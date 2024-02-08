@@ -103,3 +103,9 @@ def visualize_book_data(stock_id, time_id):
     plt.show()
 
 visualize_book_data(70,24600)
+
+
+#%%
+#Charging only 0 of test
+book_test_0 = pd.read_parquet(r'D:/BigData_staging/BIGDATAPROYECT/book_test.parquet/stock_id=0')
+book_test_0.info()
