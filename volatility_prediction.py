@@ -241,42 +241,54 @@ plt.savefig('histogram of features normal', dpi=100)
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
+from sklearn.metrics import r2_score,mean_squared_error
 
 def rmspe(y_true, y_pred):
     loss = np.sqrt(np.mean(np.square((y_true-y_pred)/y_true)))
     return loss
 
 # df = pd.read_csv("./trade_book_df.csv", index_col=0)
-y = trade_book_df['target']
-X = trade_book_df.drop(['target', 'row_id'], axis=1)
+# y = trade_book_df['target']
+# X = trade_book_df.drop(['target', 'row_id'], axis=1)
 
 knn=KNeighborsRegressor()
 params={'n_neighbors':np.arange(1,10)}
 kfold = KFold(n_splits=5, shuffle= True, random_state= 1)
-rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2')
+rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='mse')
 
-rgcv.fit(X,y)
+rgcv.fit(X_train_scaled,y_train_scaled)
 print(rgcv.best_params_)
 print(rgcv.best_score_)
-
+    
+# scoring r2
 # {'n_neighbors': 9}
-# 0.46932818574094065
+# 0.6937467574489175
+
+y_pred_scaled=rgcv.predict(X_test_scaled)
+y_pred=qt_y.inverse_transform(y_pred_scaled)
+#scores:
+print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+    
+
+# rmspe: 0.4133285602395383
+# r2_score: 0.671660878541061
+# mean_squared_error: 2.8263009473929675e-06
 
 #%%
-#Now we create the test data
-list_test_id = [0]
+#Now we create the test data for submision
+# list_test_id = [0]
 
-trade_test_df = prep_merge_trade_book(list_test_id,'test')
-trade_test_df.to_csv('trade_test_df.csv')
-
-
-X_test=trade_test_df.drop(['target', 'row_id'],axis=1)
-y_pred=rgcv.predict(X_test)
-
-# array([0.00187766])
+# trade_test_df = prep_merge_trade_book(list_test_id,'test')
+# trade_test_df.to_csv('trade_test_df.csv')
 
 
-#%%
-ss = pd.read_csv(path+"\sample_submission.csv")
-ss['target']=y_pred
-ss.to_csv('optiver_knn.csv',index=False)
+# X_test=trade_test_df.drop(['target', 'row_id'],axis=1)
+# y_pred=rgcv.predict(X_test)
+
+# # array([0.00187766])
+
+# ss = pd.read_csv(path+"\sample_submission.csv")
+# ss['target']=y_pred
+# ss.to_csv('optiver_knn.csv',index=False)
