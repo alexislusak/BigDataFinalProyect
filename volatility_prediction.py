@@ -28,6 +28,9 @@ def log_return(wap):
 def volatility(log_return):
     return np.sqrt(np.sum(log_return**2))
 
+def relative_fluctuation(data):
+    return np.std(data)/np.mean(data)
+
 def preprocess_book(file_path):
     stock_id = file_path.split("=")[1]
     book_df=pd.read_parquet(file_path)
@@ -39,21 +42,25 @@ def preprocess_book(file_path):
     book_df['log_return2'] = log_return(book_df['micro_price2'])
     
     # Spread normalized by "mean price"
-    # book_df['spread'] = 2*(book_df['ask_price1'] - book_df['bid_price1'])/(book_df['ask_price1'] + book_df['bid_price1'])
+    book_df['spread'] = 2*(book_df['ask_price1'] - book_df['bid_price1'])/(book_df['ask_price1'] + book_df['bid_price1'])
     # # Low market depth could indicate a sharp future price movement in case of aggressive buy or sell 
-    # book_df['ask_depth'] = book_df['ask_size1'] + book_df['ask_size2'] 
-    # book_df['bid_depth'] = book_df['bid_size1'] + book_df['bid_size2']
+    book_df['ask_depth'] = book_df['ask_size1'] + book_df['ask_size2'] 
+    book_df['bid_depth'] = book_df['bid_size1'] + book_df['bid_size2']
     
-    # book_df['volume_imbalance'] = np.abs(book_df['ask_size1'] - book_df['bid_size1'])*2/(book_df['ask_size1']+book_df['bid_size1'])
+    book_df['volume_imbalance'] = np.abs(book_df['ask_size1'] - book_df['bid_size1'])*2/(book_df['ask_size1']+book_df['bid_size1'])
     
    
     aggregate = {
         'log_return1' : volatility,
         'log_return2' : volatility,
-        # 'spread' : np.mean,
-        # 'ask_depth' : np.mean,
-        # 'bid_depth' : np.mean,
-        # 'volume_imbalance' : np.mean
+        'spread' : 'mean',
+        'ask_depth' : 'mean',
+        'bid_depth' : 'mean',
+        'bid_price1': relative_fluctuation,
+        'ask_size1': relative_fluctuation,
+        'bid_price2': relative_fluctuation,
+        'ask_size2': relative_fluctuation,            
+        'volume_imbalance' : 'mean'
     }
 
     preprocessed_df = book_df.groupby('time_id').agg(aggregate)
@@ -76,16 +83,17 @@ def preprocess_book(file_path):
     # return preprocessed_df.merge(preprocessed_df_last_300, how='left', on='row_id')
     return preprocessed_df
 
-def relative_fluctuation(data):
-    return np.std(data)/np.mean(data)
-
 def preprocess_trade(file_path):
     stock_id = file_path.split("=")[1]
     trade_df = pd.read_parquet(file_path)
+    trade_df['size_total']=trade_df['size']
+    trade_df['order_count_total']=trade_df['order_count']
     aggregate = {
         'price': relative_fluctuation,
         'size': relative_fluctuation,
-        'order_count': relative_fluctuation
+        'order_count': relative_fluctuation,
+        'size_total':'sum',
+        'order_count_total': 'sum'
     }
     preprocessed_df = trade_df.groupby('time_id').agg(aggregate)
     preprocessed_df = preprocessed_df.rename(columns={'price':'trade_price_fluc', 
@@ -138,27 +146,41 @@ def prep_merge_trade_book(list_stock_id,state='train'):
     return trade_book_df.merge(train_df, how='left', on='row_id').reset_index(drop=True)
 
 trade_book_df = prep_merge_trade_book(list_stock_id)
-trade_book_df.to_csv('trade_book_df.csv')
+trade_book_df.to_csv('trade_book_df2.csv')
+
+# trade_book_df=pd.read_csv(path+'/trade_book_df2.csv')
 
 
 #ALERT
 #We have 19 nan values we will deleted
 trade_book_df.dropna(inplace=True)
 
+
 #%%
 #We see the correlation of the differents features
 import seaborn as sns
-corr = trade_book_df[['volatility1', 'volatility2', 'trade_price_fluc', 'size_fluc',
-       'orders_fluc', 'target']].corr()
-fig = plt.figure(figsize=(5, 4))
+# corr = trade_book_df[['volatility1', 'volatility2', 'trade_price_fluc', 'size_fluc',
+       # 'orders_fluc', 'target']].corr()
+# fig = plt.figure(figsize=(5, 4))
+corr = trade_book_df.drop(['row_id','bid_price1','bid_price2','ask_size1','ask_size2'],axis=1).corr()
+fig = plt.figure(figsize=(10, 9))
 sns.heatmap(corr, annot=True, cmap="coolwarm")
+plt.title('Correlation features')
+plt.savefig('big correlation', dpi=50)
 
+#%%
+#Now we only considerer the important features.
+trade_book_df.drop(['bid_price1','bid_price2','ask_size1','ask_size2','ask_depth', 'bid_depth', 
+                    'size_total', 'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
+
+#In total we have 428913 Row_id so will  take 20% for test this is 85.000 row and time id
 
 #%%
 #Now we analize the data with knn
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
 
 def rmspe(y_true, y_pred):
     loss = np.sqrt(np.mean(np.square((y_true-y_pred)/y_true)))
@@ -171,11 +193,14 @@ X = trade_book_df.drop(['target', 'row_id'], axis=1)
 knn=KNeighborsRegressor()
 params={'n_neighbors':np.arange(1,10)}
 kfold = KFold(n_splits=5, shuffle= True, random_state= 23)
-rgcv=RandomizedSearchCV(knn, param_distributions=params,n_iter=2,cv=kfold, random_state=1,scoring='r2')
+rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2')
 
 rgcv.fit(X,y)
 print(rgcv.best_params_)
 print(rgcv.best_score_)
+
+# {'n_neighbors': 9}
+# 0.46932818574094065
 
 #%%
 #Now we create the test data
@@ -188,7 +213,7 @@ trade_test_df.to_csv('trade_test_df.csv')
 X_test=trade_test_df.drop(['target', 'row_id'],axis=1)
 y_pred=rgcv.predict(X_test)
 
-
+# array([0.00187766])
 
 
 #%%
