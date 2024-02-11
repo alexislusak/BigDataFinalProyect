@@ -179,7 +179,8 @@ corr = trade_book_df_train.drop('row_id',axis=1).corr()
 fig = plt.figure(figsize=(10, 9))
 sns.heatmap(corr, annot=True, cmap="coolwarm")
 plt.title('Correlation features')
-plt.savefig('big correlation train', dpi=50)
+plt.savefig('big correlation train', dpi=100)
+plt.show()
 
 #%%
 #Now we only considerer the important features.
@@ -190,11 +191,56 @@ trade_book_df_test.drop(['ask_depth', 'bid_depth', 'size_total',
                           'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
 
 #%%
+#We see the histogram of the diferents features
+
+trade_book_df_train.hist(figsize=(10,10),bins=200) 
+plt.savefig('histogram of features', dpi=100)
+
+#We see a huge skewees so will use the scaler to transform in a normal distribution
+
+#%%
+#QuantileTransformer
+
+from sklearn.preprocessing import QuantileTransformer
+from sklearn.compose import ColumnTransformer
+
+trade_book_df_train.set_index('row_id',inplace=True)
+trade_book_df_test.set_index('row_id',inplace=True)
+
+y_train=trade_book_df_train['target']
+y_test=trade_book_df_test['target']
+X_train=trade_book_df_train.drop('target',axis=1)
+X_test=trade_book_df_test.drop('target',axis=1)
+
+qt_x=QuantileTransformer(output_distribution='normal').set_output(transform="pandas")
+qt_y=QuantileTransformer(output_distribution='normal').set_output(transform="pandas")
+
+# ct= ColumnTransformer(
+#         remainder='passthrough', #passthough features not listed
+#         transformers=[
+#             ('std', qt , ['volatility2', 'volume_imbalance','trade_price_fluc',
+#                    'size_fluc', 'target'])
+#         ])
+
+# ct.set_output(transform="pandas")
+
+# X_train_scaled,y_train_scaled=ct.fit_transform(X_train,y_train)
+# X_test_scaled,y_test_scaled=ct.transform(X_test,y_test)
+
+X_train_scaled=qt_x.fit_transform(X_train)
+X_test_scaled=qt_x.transform(X_test)
+
+y_train_scaled=qt_y.fit_transform(pd.DataFrame(y_train))
+y_test_scaled=qt_y.transform(pd.DataFrame(y_test))
+
+X_train_scaled.join(y_train_scaled).hist(figsize=(10,10),bins=200) 
+plt.savefig('histogram of features normal', dpi=100)
+
+#%%
 #Now we analize the data with knn
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
 
 def rmspe(y_true, y_pred):
     loss = np.sqrt(np.mean(np.square((y_true-y_pred)/y_true)))
@@ -206,7 +252,7 @@ X = trade_book_df.drop(['target', 'row_id'], axis=1)
 
 knn=KNeighborsRegressor()
 params={'n_neighbors':np.arange(1,10)}
-kfold = KFold(n_splits=5, shuffle= True, random_state= 23)
+kfold = KFold(n_splits=5, shuffle= True, random_state= 1)
 rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2')
 
 rgcv.fit(X,y)
