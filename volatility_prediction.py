@@ -148,12 +148,25 @@ def prep_merge_trade_book(list_stock_id,state='train'):
 trade_book_df = prep_merge_trade_book(list_stock_id)
 trade_book_df.to_csv('trade_book_df2.csv')
 
-# trade_book_df=pd.read_csv(path+'/trade_book_df2.csv')
+ # trade_book_df=pd.read_csv(path+'/trade_book_df2.csv')
 
 
 #ALERT
 #We have 19 nan values we will deleted
 trade_book_df.dropna(inplace=True)
+
+#%%
+#Now we define the train test
+#In total we have 428913 Row_id so will  take 20% for test this is 85.000 row and time id
+
+from sklearn.model_selection import train_test_split
+
+trade_book_df.drop(['bid_price1','bid_price2','ask_size1','ask_size2'],axis=1,inplace=True)
+trade_book_df_train,trade_book_df_test= train_test_split(trade_book_df,test_size=0.2,random_state=1)
+
+
+trade_book_df_train.drop('Unnamed: 0',axis=1, inplace=True)
+trade_book_df_test.drop('Unnamed: 0',axis=1, inplace=True)
 
 
 #%%
@@ -162,18 +175,19 @@ import seaborn as sns
 # corr = trade_book_df[['volatility1', 'volatility2', 'trade_price_fluc', 'size_fluc',
        # 'orders_fluc', 'target']].corr()
 # fig = plt.figure(figsize=(5, 4))
-corr = trade_book_df.drop(['row_id','bid_price1','bid_price2','ask_size1','ask_size2'],axis=1).corr()
+corr = trade_book_df_train.drop('row_id',axis=1).corr()
 fig = plt.figure(figsize=(10, 9))
 sns.heatmap(corr, annot=True, cmap="coolwarm")
 plt.title('Correlation features')
-plt.savefig('big correlation', dpi=50)
+plt.savefig('big correlation train', dpi=50)
 
 #%%
 #Now we only considerer the important features.
-trade_book_df.drop(['bid_price1','bid_price2','ask_size1','ask_size2','ask_depth', 'bid_depth', 
-                    'size_total', 'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
+trade_book_df_train.drop(['ask_depth', 'bid_depth', 'size_total',
+                          'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
 
-#In total we have 428913 Row_id so will  take 20% for test this is 85.000 row and time id
+trade_book_df_test.drop(['ask_depth', 'bid_depth', 'size_total',
+                          'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
 
 #%%
 #Now we analize the data with knn
