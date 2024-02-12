@@ -254,7 +254,7 @@ def rmspe(y_true, y_pred):
 knn=KNeighborsRegressor()
 params={'n_neighbors':np.arange(1,10)}
 kfold = KFold(n_splits=5, shuffle= True, random_state= 1)
-rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='mse')
+rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2')
 
 rgcv.fit(X_train_scaled,y_train_scaled)
 print(rgcv.best_params_)
@@ -271,10 +271,55 @@ print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
 print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
 print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
     
-
+# scoring r2
 # rmspe: 0.4133285602395383
 # r2_score: 0.671660878541061
 # mean_squared_error: 2.8263009473929675e-06
+
+#%%
+#Now we tray with XGBRegressor
+from xgboost import XGBRegressor
+
+# Define hyperparameter grid
+param_grid = {
+    "n_estimators": [10, 100, 300],  # Number of trees
+    "learning_rate": [0.01, 0.1, 0.3],  # Learning rate
+    "max_depth": [3, 5, 7],  # Maximum tree depth
+    "colsample_bytree": [0.7, 0.9],  # Subsample ratio of columns
+    "subsample": [0.8, 1.0]  # Subsample ratio of features
+}
+kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
+# Create the XGBoost model
+xgb_model = XGBRegressor()
+
+# Create RandomizedSearchCV object
+gs_xb = GridSearchCV(
+    estimator=xgb_model, param_grid=param_grid,cv=kfold, 
+    scoring='r2', verbose=3)
+
+# Conduct randomized search
+gs_xb.fit(X_train_scaled,y_train_scaled)
+
+print('Best parameters',gs_xb.best_params_)
+print('Best score',gs_xb.best_score_)
+    
+# scoring r2
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.722527456187711
+
+y_pred_scaled=gs_xb.predict(X_test_scaled)
+y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
+
+#scores:
+print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+    
+# scoring r2
+# r2_score: 0.696937860963547
+# mean_squared_error: 2.6087199322203925e-06
+# rmspe: 0.3833798891315117
+
 
 #%%
 #Now we create the test data for submision
