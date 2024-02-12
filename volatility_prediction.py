@@ -66,22 +66,22 @@ def preprocess_book(file_path):
     preprocessed_df = book_df.groupby('time_id').agg(aggregate)
     preprocessed_df = preprocessed_df.rename(columns={'log_return1':'volatility1',
                                                       'log_return2':'volatility2'})
-    # preprocessed_df_last_300 = book_df[book_df['seconds_in_bucket']>300].groupby('time_id').agg(aggregate)
-    # preprocessed_df_last_300 = preprocessed_df_last_300.rename(columns={'log_return1':'realized_volatility1_last_300',
-    #                                                            'log_return2':'realized_volatility2_last_300',
-    #                                                            'spread':'spread_last_300',
-    #                                                            'ask_depth':'ask_depth_last_300',
-    #                                                            'bid_depth':'bid_depth_last_300',
-    #                                                            'volume_imbalance':'volume_imbalance_last_300'})
+    preprocessed_df_last_300 = book_df[book_df['seconds_in_bucket']>300].groupby('time_id').agg(aggregate)
+    preprocessed_df_last_300 = preprocessed_df_last_300.rename(columns={'log_return1':'realized_volatility1_last_300',
+                                                                'log_return2':'realized_volatility2_last_300',
+                                                                'spread':'spread_last_300',
+                                                                'ask_depth':'ask_depth_last_300',
+                                                                'bid_depth':'bid_depth_last_300',
+                                                                'volume_imbalance':'volume_imbalance_last_300'})
     
     preprocessed_df.reset_index(inplace=True)
-    # preprocessed_df_last_300.reset_index(inplace=True)
+    preprocessed_df_last_300.reset_index(inplace=True)
     preprocessed_df['row_id'] = preprocessed_df['time_id'].apply(lambda x:f'{stock_id}-{x}')
     preprocessed_df.drop('time_id', axis=1, inplace=True)
-    # preprocessed_df_last_300['row_id'] = preprocessed_df_last_300['time_id'].apply(lambda x:f'{stock_id}-{x}')
-    # preprocessed_df_last_300.drop('time_id', axis=1, inplace=True)
-    # return preprocessed_df.merge(preprocessed_df_last_300, how='left', on='row_id')
-    return preprocessed_df
+    preprocessed_df_last_300['row_id'] = preprocessed_df_last_300['time_id'].apply(lambda x:f'{stock_id}-{x}')
+    preprocessed_df_last_300.drop('time_id', axis=1, inplace=True)
+    return preprocessed_df.merge(preprocessed_df_last_300, how='left', on='row_id')
+    # return preprocessed_df
 
 def preprocess_trade(file_path):
     stock_id = file_path.split("=")[1]
@@ -103,20 +103,16 @@ def preprocess_trade(file_path):
     preprocessed_df['row_id'] = preprocessed_df['time_id'].apply(lambda x:f'{stock_id}-{x}')
     preprocessed_df.drop('time_id', axis=1, inplace=True)
     
-    # preprocessed_df_last_300 = trade_df[trade_df['seconds_in_bucket']>300].groupby('time_id').agg(aggregate)
-    # preprocessed_df_last_300 = preprocessed_df_last_300.rename(columns={'price':'trace_price_rv_last_300', 
-    #                                                                     'size':'volume_last_300', 
-    #                                                                     'order_count':'number_of_orders_last_300'})
-    # preprocessed_df_last_300.reset_index(inplace=True)
-    # preprocessed_df_last_300['row_id'] = preprocessed_df_last_300['time_id'].apply(lambda x:f'{stock_id}-{x}')
-    # preprocessed_df_last_300.drop('time_id', axis=1, inplace=True)
-    # return preprocessed_df.merge(preprocessed_df_last_300, how='left', on='row_id')
-    return preprocessed_df
+    preprocessed_df_last_300 = trade_df[trade_df['seconds_in_bucket']>300].groupby('time_id').agg(aggregate)
+    preprocessed_df_last_300 = preprocessed_df_last_300.rename(columns={'price':'trace_price_rv_last_300', 
+                                                                        'size':'volume_last_300', 
+                                                                        'order_count':'number_of_orders_last_300'})
+    preprocessed_df_last_300.reset_index(inplace=True)
+    preprocessed_df_last_300['row_id'] = preprocessed_df_last_300['time_id'].apply(lambda x:f'{stock_id}-{x}')
+    preprocessed_df_last_300.drop('time_id', axis=1, inplace=True)
+    return preprocessed_df.merge(preprocessed_df_last_300, how='left', on='row_id')
+    # return preprocessed_df
 
-
-# prueba=preprocess_trade(path+"/trade_train.parquet/stock_id=0")
-
-# pruebabook=preprocess_book(path+"/book_train.parquet/stock_id=0")
 
 from joblib import Parallel, delayed
 
@@ -146,9 +142,9 @@ def prep_merge_trade_book(list_stock_id,state='train'):
     return trade_book_df.merge(train_df, how='left', on='row_id').reset_index(drop=True)
 
 trade_book_df = prep_merge_trade_book(list_stock_id)
-trade_book_df.to_csv('trade_book_df2.csv')
+trade_book_df.to_csv('trade_book_df3.csv')
 
- # trade_book_df=pd.read_csv(path+'/trade_book_df2.csv')
+  # trade_book_df=pd.read_csv(path+'/trade_book_df3.csv')
 
 
 #ALERT
@@ -161,7 +157,9 @@ trade_book_df.dropna(inplace=True)
 
 from sklearn.model_selection import train_test_split
 
-trade_book_df.drop(['bid_price1','bid_price2','ask_size1','ask_size2'],axis=1,inplace=True)
+# trade_book_df.drop(['bid_price1','bid_price2','ask_size1','ask_size2'],axis=1,inplace=True)
+trade_book_df.drop(['bid_price1_x', 'ask_size1_x', 'bid_price2_x', 'ask_size2_x',
+                    'bid_price1_y', 'ask_size1_y', 'bid_price2_y', 'ask_size2_y'],axis=1,inplace=True)
 trade_book_df_train,trade_book_df_test= train_test_split(trade_book_df,test_size=0.2,random_state=1)
 
 
@@ -176,25 +174,33 @@ import seaborn as sns
        # 'orders_fluc', 'target']].corr()
 # fig = plt.figure(figsize=(5, 4))
 corr = trade_book_df_train.drop('row_id',axis=1).corr()
-fig = plt.figure(figsize=(10, 9))
+fig = plt.figure(figsize=(12, 12))
 sns.heatmap(corr, annot=True, cmap="coolwarm")
 plt.title('Correlation features')
-plt.savefig('big correlation train', dpi=100)
+plt.savefig('big correlation train30', dpi=100)
 plt.show()
 
 #%%
 #Now we only considerer the important features.
-trade_book_df_train.drop(['ask_depth', 'bid_depth', 'size_total',
-                          'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
+# trade_book_df_train.drop(['ask_depth', 'bid_depth', 'size_total',
+#                           'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
 
-trade_book_df_test.drop(['ask_depth', 'bid_depth', 'size_total',
-                          'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
+# trade_book_df_test.drop(['ask_depth', 'bid_depth', 'size_total',
+#                           'order_count_total','volatility1','spread','orders_fluc'],axis=1,inplace=True)
+
+trade_book_df_train= trade_book_df_train[['row_id','volatility1','volatility2','realized_volatility1_last_300',
+                                          'realized_volatility2_last_300','volume_imbalance',
+                                         'trade_price_fluc','orders_fluc','target']]
+
+trade_book_df_test=trade_book_df_test[['row_id','volatility1','volatility2','realized_volatility1_last_300', 
+                                       'realized_volatility2_last_300','volume_imbalance',
+                                         'trade_price_fluc','orders_fluc','target']]
 
 #%%
 #We see the histogram of the diferents features
 
 trade_book_df_train.hist(figsize=(10,10),bins=200) 
-plt.savefig('histogram of features', dpi=100)
+plt.savefig('histogram of features300', dpi=100)
 
 #We see a huge skewees so will use the scaler to transform in a normal distribution
 
@@ -202,7 +208,7 @@ plt.savefig('histogram of features', dpi=100)
 #QuantileTransformer
 
 from sklearn.preprocessing import QuantileTransformer
-from sklearn.compose import ColumnTransformer
+# from sklearn.compose import ColumnTransformer
 
 trade_book_df_train.set_index('row_id',inplace=True)
 trade_book_df_test.set_index('row_id',inplace=True)
@@ -234,7 +240,7 @@ y_train_scaled=qt_y.fit_transform(pd.DataFrame(y_train))
 y_test_scaled=qt_y.transform(pd.DataFrame(y_test))
 
 X_train_scaled.join(y_train_scaled).hist(figsize=(10,10),bins=200) 
-plt.savefig('histogram of features normal', dpi=100)
+plt.savefig('histogram of features normal300b', dpi=100)
 
 #%%
 #Now we analize the data with knn
@@ -252,9 +258,10 @@ def rmspe(y_true, y_pred):
 # X = trade_book_df.drop(['target', 'row_id'], axis=1)
 
 knn=KNeighborsRegressor()
-params={'n_neighbors':np.arange(1,10)}
+params={'n_neighbors':[15,100,500,1000],
+        'weights':['uniform']}
 kfold = KFold(n_splits=5, shuffle= True, random_state= 1)
-rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2')
+rgcv=GridSearchCV(knn,param_grid=params,cv=kfold,scoring='r2',verbose=3)
 
 rgcv.fit(X_train_scaled,y_train_scaled)
 print(rgcv.best_params_)
@@ -276,23 +283,42 @@ print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
 # r2_score: 0.671660878541061
 # mean_squared_error: 2.8263009473929675e-06
 
+#With all the features
+# {'n_neighbors': 9}
+# 0.8134632252968972
+# r2_score: 0.7775509552777532
+# mean_squared_error: 1.909650837788346e-06
+# rmspe: 0.2962377609243982
+
+# {'n_neighbors': 14, 'weights': 'uniform'}
+# 0.8197267743691239
+# r2_score: 0.7845411154777341
+# mean_squared_error: 1.8496426444565388e-06
+# rmspe: 0.29011896301056317
+
+# {'n_neighbors': 100, 'weights': 'uniform'}
+# 0.8280252795712435
+# r2_score: 0.7944724081649561
+# mean_squared_error: 1.764385809912002e-06
+# rmspe: 0.28542365963948113
+
 #%%
 #Now we tray with XGBRegressor
 from xgboost import XGBRegressor
 
 # Define hyperparameter grid
 param_grid = {
-    "n_estimators": [10, 100, 300],  # Number of trees
-    "learning_rate": [0.01, 0.1, 0.3],  # Learning rate
-    "max_depth": [3, 5, 7],  # Maximum tree depth
-    "colsample_bytree": [0.7, 0.9],  # Subsample ratio of columns
-    "subsample": [0.8, 1.0]  # Subsample ratio of features
+    "n_estimators": [250,300,350],  # Number of trees 10, 100,300
+    "learning_rate": [0.075, 0.1, 0.125],  # Learning rate
+    "max_depth": [4, 5, 6],  # Maximum tree depth
+    "colsample_bytree": [0.8, 0.9,0.95],  # Subsample ratio of columns
+    "subsample": [0.7,0.8,0.9]  # Subsample ratio of features 0.8,1
 }
 kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
 # Create the XGBoost model
 xgb_model = XGBRegressor()
 
-# Create RandomizedSearchCV object
+# Create GridSearchCV object
 gs_xb = GridSearchCV(
     estimator=xgb_model, param_grid=param_grid,cv=kfold, 
     scoring='r2', verbose=3)
@@ -302,11 +328,8 @@ gs_xb.fit(X_train_scaled,y_train_scaled)
 
 print('Best parameters',gs_xb.best_params_)
 print('Best score',gs_xb.best_score_)
-    
-# scoring r2
-# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
-# Best score 0.722527456187711
 
+#Prediction
 y_pred_scaled=gs_xb.predict(X_test_scaled)
 y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
 
@@ -316,10 +339,177 @@ print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
 print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
     
 # scoring r2
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.722527456187711
 # r2_score: 0.696937860963547
 # mean_squared_error: 2.6087199322203925e-06
 # rmspe: 0.3833798891315117
 
+#using last300
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.8234728322597545
+# r2_score: 0.7908750740115169
+# mean_squared_error: 1.795267723513822e-06
+# rmspe: 0.28464771192490085
+
+#last300+volatility1
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.8291825487762917
+# r2_score: 0.7938152251514328
+# mean_squared_error: 1.7700275068404924e-06
+# rmspe: 0.279516465317215
+
+#using 300 volatility2 
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.8301626848216914
+# r2_score: 0.795384103190476
+# mean_squared_error: 1.7565592122681898e-06
+# rmspe: 0.2745513232796968
+
+#using 300 volatility2 + size_fluc BYE
+# Best parameters {'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+# Best score 0.8316561312588867
+# r2_score: 0.7974824541795368
+# mean_squared_error: 1.738545569057281e-06
+# rmspe: 0.2751983156439022
+
+#refined
+# Best parameters {'colsample_bytree': 0.8, 'learning_rate': 0.075, 'max_depth': 5, 'n_estimators': 350, 'subsample': 0.9}
+# Best score 0.8311720883407596
+# r2_score: 0.7964928902048224
+# mean_squared_error: 1.7470406456520948e-06
+# rmspe: 0.27512861521773435
+
+#%%
+# #Now SVM
+# from sklearn.svm import SVR
+
+# # Define hyperparameter grid
+# param_grid = {
+#     "C": [0.5, 1, 10],  # Regularization parameter
+#     # "kernel": ["linear","poly","rbf"]  # Kernel type
+#     #"gamma": ["scale", "auto"]  # Kernel coefficient for rbf
+# }
+# kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
+# # Create the SVR model
+# svr = SVR(kernel="linear")
+
+# # Create GridSearchCV object
+# gs_svm = GridSearchCV(
+#     estimator=svr, param_grid=param_grid,cv=kfold, 
+#     scoring='r2', verbose=3)
+
+# # Conduct randomized search
+# gs_svm.fit(X_train_scaled,y_train_scaled['target'])
+
+# print('Best parameters',gs_svm.best_params_)
+# print('Best score',gs_svm.best_score_)
+    
+# # scoring r2
+
+
+# y_pred_scaled=gs_svm.predict(X_test_scaled)
+# y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
+
+# #scores:
+# print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+# print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+# print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+    
+# # scoring r2
+
+#%%
+#Now Elasticnet
+from sklearn.linear_model import ElasticNet
+
+# Define hyperparameter grid
+param_grid={'alpha':np.linspace(0.0001,1,10),
+        'l1_ratio':np.linspace(0.0001,1,10)}
+
+
+kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
+# Create the elastic model
+el = ElasticNet()
+
+# Create GridSearchCV object
+gs_el = GridSearchCV(
+    estimator=el, param_grid=param_grid,cv=kfold, 
+    scoring='r2', verbose=3)
+
+# Conduct randomized search
+gs_el.fit(X_train_scaled,y_train_scaled['target'])
+
+print('Best parameters',gs_el.best_params_)
+print('Best score',gs_el.best_score_)
+    
+
+y_pred_scaled=gs_el.predict(X_test_scaled)
+y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
+
+#scores:
+print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+   
+#With all features 
+# Best parameters {'alpha': 0.001, 'l1_ratio': 0.001}
+# Best score 0.8234578649982144
+# r2_score: 0.7822250352536889
+# mean_squared_error: 1.8695254205132102e-06
+# rmspe: 0.29155588541566374
+
+
+
+#%%
+#Stacking
+from sklearn.ensemble import StackingRegressor,RandomForestRegressor
+from sklearn.linear_model import ElasticNet
+from xgboost import XGBRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import KFold
+from sklearn.metrics import r2_score,mean_squared_error
+
+def rmspe(y_true, y_pred):
+    loss = np.sqrt(np.mean(np.square((y_true-y_pred)/y_true)))
+    return loss
+
+rdf=RandomForestRegressor(random_state=1)
+knn=KNeighborsRegressor()
+xgb_model = XGBRegressor()
+el = ElasticNet()
+
+
+stack=StackingRegressor([('knn',knn),('XG',xgb_model),('el',el)],
+                         final_estimator=rdf)
+params={'knn__n_neighbors':[80,100,120],
+        "XG__n_estimators": [250,300,350],  # Number of trees 10, 100,300
+        "XG__learning_rate": [0.075, 0.1],  # Learning rate
+        "XG__max_depth": [4, 5],  # Maximum tree depth
+        "XG__colsample_bytree": [0.8, 0.9],  # Subsample ratio of columns
+        "XG__subsample": [0.8,0.9],
+        'el__alpha':[0.001, 0.01],
+        'el__l1_ratio':[0.001],
+        'final_estimator__max_features':[2,3,4,5],
+        'passthrough':[True,False]}
+
+gcv_stack=GridSearchCV(stack, param_grid=params,
+                 cv=kfold,verbose=3)
+
+gcv_stack.fit(X_train_scaled,y_train_scaled['target'],verbose=3)
+
+print('Best parameters',gcv_stack.best_params_)
+print('Best score',gcv_stack.best_score_)
+    
+y_pred_scaled=gcv_stack.predict(X_test_scaled)
+y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
+
+#scores:
+print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+    
+# scoring r2
 
 #%%
 #Now we create the test data for submision
