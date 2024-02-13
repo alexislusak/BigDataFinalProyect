@@ -42,14 +42,15 @@ def preprocess_book(file_path):
     book_df['log_return2'] = log_return(book_df['micro_price2'])
     
     # Spread normalized by "mean price"
-    book_df['spread'] = 2*(book_df['ask_price1'] - book_df['bid_price1'])/(book_df['ask_price1'] + book_df['bid_price1'])
+    book_df['spread'] = 2*(book_df['ask_price1'] - book_df['bid_price1'])/(book_df['ask_price1'] 
+                                                                           + book_df['bid_price1'])
     # # Low market depth could indicate a sharp future price movement in case of aggressive buy or sell 
     book_df['ask_depth'] = book_df['ask_size1'] + book_df['ask_size2'] 
     book_df['bid_depth'] = book_df['bid_size1'] + book_df['bid_size2']
     
-    book_df['volume_imbalance'] = np.abs(book_df['ask_size1'] - book_df['bid_size1'])*2/(book_df['ask_size1']+book_df['bid_size1'])
+    book_df['volume_imbalance'] = np.abs(book_df['ask_size1'] - 
+                                         book_df['bid_size1'])*2/(book_df['ask_size1']+book_df['bid_size1'])
     
-   
     aggregate = {
         'log_return1' : volatility,
         'log_return2' : volatility,
@@ -458,6 +459,51 @@ print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
 # mean_squared_error: 1.8695254205132102e-06
 # rmspe: 0.29155588541566374
 
+#%%
+#Now Elasticnet with poly
+# from sklearn.linear_model import ElasticNet
+# from sklearn.preprocessing import PolynomialFeatures
+# from sklearn.pipeline import Pipeline
+
+# poly= PolynomialFeatures(degree=5)
+# # Define hyperparameter grid
+# param_grid={'EL__alpha':np.linspace(0.001,1,3),
+#         'EL__l1_ratio':np.linspace(0.001,1,3),
+#         'POLY__degree':np.arange(3,6)}
+
+
+# kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
+# # Create the elastic model
+# el = ElasticNet()
+
+# pipe= Pipeline([('POLY',poly),('EL',el)])
+
+# # Create GridSearchCV object
+# gs_elp = GridSearchCV(
+#     estimator=pipe, param_grid=param_grid,cv=kfold, 
+#     scoring='r2', verbose=3)
+
+# # Conduct randomized search
+# gs_elp.fit(X_train_scaled,y_train_scaled['target'])
+
+# print('Best parameters',gs_elp.best_params_)
+# print('Best score',gs_elp.best_score_)
+    
+
+# y_pred_scaled=gs_elp.predict(X_test_scaled)
+# y_pred=qt_y.inverse_transform(pd.DataFrame(y_pred_scaled))
+
+# #scores:
+# print('r2_score:', r2_score(pd.DataFrame(y_test),y_pred))
+# print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
+# print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
+   
+
+# Best parameters {'EL__alpha': 0.001, 'EL__l1_ratio': 0.5005, 'POLY__degree': 4}
+# Best score 0.8308566050608938
+# r2_score: 0.7903124497658961
+# mean_squared_error: 1.800097664965589e-06
+# rmspe: 0.2884680112832094
 
 
 #%%
@@ -479,24 +525,36 @@ knn=KNeighborsRegressor()
 xgb_model = XGBRegressor()
 el = ElasticNet()
 
+kfold = KFold(n_splits=3, shuffle= True, random_state= 1)
 
 stack=StackingRegressor([('knn',knn),('XG',xgb_model),('el',el)],
                          final_estimator=rdf)
-params={'knn__n_neighbors':[80,100,120],
-        "XG__n_estimators": [250,300,350],  # Number of trees 10, 100,300
-        "XG__learning_rate": [0.075, 0.1],  # Learning rate
-        "XG__max_depth": [4, 5],  # Maximum tree depth
-        "XG__colsample_bytree": [0.8, 0.9],  # Subsample ratio of columns
-        "XG__subsample": [0.8,0.9],
-        'el__alpha':[0.001, 0.01],
+params={'knn__n_neighbors':[100],
+        "XG__n_estimators": [300],  # Number of trees 10, 100,300
+        "XG__learning_rate": [0.075],  # Learning rate
+        "XG__max_depth": [5],  # Maximum tree depth
+        "XG__colsample_bytree": [0.8],  # Subsample ratio of columns
+        "XG__subsample": [0.9],
+        'el__alpha':[0.001],
         'el__l1_ratio':[0.001],
-        'final_estimator__max_features':[2,3,4,5],
+        'final_estimator__max_features':[2,5],
         'passthrough':[True,False]}
+
+# params={'knn__n_neighbors':[80,100,120],
+#         "XG__n_estimators": [250,300,350],  # Number of trees 10, 100,300
+#         "XG__learning_rate": [0.075, 0.1],  # Learning rate
+#         "XG__max_depth": [4, 5],  # Maximum tree depth
+#         "XG__colsample_bytree": [0.8, 0.9],  # Subsample ratio of columns
+#         "XG__subsample": [0.8,0.9],
+#         'el__alpha':[0.001, 0.01],
+#         'el__l1_ratio':[0.001],
+#         'final_estimator__max_features':[2,3,4,5],
+#         'passthrough':[True,False]}
 
 gcv_stack=GridSearchCV(stack, param_grid=params,
                  cv=kfold,verbose=3)
 
-gcv_stack.fit(X_train_scaled,y_train_scaled['target'],verbose=3)
+gcv_stack.fit(X_train_scaled,y_train_scaled['target'])
 
 print('Best parameters',gcv_stack.best_params_)
 print('Best score',gcv_stack.best_score_)
@@ -510,6 +568,11 @@ print('mean_squared_error:', mean_squared_error(pd.DataFrame(y_test),y_pred))
 print('rmspe:', rmspe(pd.DataFrame(y_test),y_pred))
     
 # scoring r2
+# Best parameters {'XG__colsample_bytree': 0.8, 'XG__learning_rate': 0.075, 'XG__max_depth': 5, 'XG__n_estimators': 300, 'XG__subsample': 0.9, 'el__alpha': 0.001, 'el__l1_ratio': 0.001, 'final_estimator__max_features': 2, 'knn__n_neighbors': 100, 'passthrough': True}
+# Best score 0.8286396965746069
+# r2_score: 0.7928918683045912
+# mean_squared_error: 1.7779542173298556e-06
+# rmspe: 0.2813165608396096
 
 #%%
 #Now we create the test data for submision
